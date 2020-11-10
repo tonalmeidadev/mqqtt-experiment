@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Teste MQQT</title>
+    <style>
+        body {
+            padding-top: 30px;
+            font-family: Verdana, Arial, Helvetica, sans-serif;
+            font-size: 11px;
+            color: black;
+            background-color: #E3E9E9;
+            background-size: cover;
+        }
+        tbody {
+            display: grid;
+        }
+        tr {
+            display: block;
+            font-size: 12px;
+            justify-self: center;
+        }
+        th {
+            display: block;
+            border-radius: 20px;
+            color: #000;
+            margin-bottom: 15px;
+            background: #CCC;
+            border: 2px solid #999;
+            padding: 4px 30px;
+        }
+        td {
+            text-align: center;
+            padding: 5px;
+            border-radius: 20px;
+            background: #E3E9E9;
+        }
+        text[text-anchor="middle"] {
+            text-anchor: middle;
+            font-family: arial;
+            font-size: 11px;
+            stroke: none;
+            stroke-width: 0;
+            fill: rgb(51, 51, 51);
+        }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/paho-mqtt/1.0.1/mqttws31.min.js"></script>
+  <script src="https://www.gstatic.com/charts/loader.js"></script>
+  <script>
+    /***************************************************
+     * Cliente MQTT */
+    // Variáveis para cliente MQTT
+    var mqtt;
+    var reconnectTimeout = 2000;
+    var host = "broker.hivemq.com";
+    var port = 8000;
+
+    function onConnect() {
+        // Conexao ao Broker
+        console.log("Conectado");
+        mqtt.subscribe("esp32vivo/sens/#");
+        mqtt.subscribe("esp32vivo/sens/hum");
+        mqtt.subscribe("esp32vivo/sens/lum");
+        mqtt.subscribe("esp32vivo/sens/temp");
+        mqtt.subscribe("esp32vivo/status");
+    }
+    function onError(message) {
+        // Ocorrencia de erro
+        console.log("Falha: " + message.errorCode + " " + message.errorMessage);
+        setTimeout(MQTTConnect, reconnectTimeout);
+    }
+    function onMessageArrived(msg) {
+        // Mensagem recebida
+        console.log("Mensagem: " + msg.destinationName + "=" + msg.payloadString);
+
+            if (msg.destinationName == "esp32vivo/sens/temp") {
+                // Temperatura
+                dataTemp.setValue(0, 1, msg.payloadString);
+                chartTemp.draw(dataTemp, optionsTemp);
+            } else if (msg.destinationName == "esp32vivo/sens/hum") {
+                // Umidade
+                dataUmi.setValue(0, 1, msg.payloadString);
+                chartUmi.draw(dataUmi, optionsUmi);
+            } else if (msg.destinationName == "esp32vivo/sens/heat") {
+                // Inteiro
+                dataInt.setValue(0, 1, msg.payloadString);
+                chartInt.draw(dataInt, optionsInt);
+            } else if (msg.destinationName == "esp32vivo/status") {
+                // Toggle
+                var t = document.getElementById("toggle");
+                if (msg.payloadString == 1) {
+                    t.innerText = "Status: Ligado";
+                    t.style.background = "rgb(170, 236, 83)";
+                } else {
+                    t.innerText = "Status: Desligado";
+                    t.style.background = "rgb(227, 0, 14)";
+                }
+            }
+        }
+    function MQTTConnect() {
+        // Conecta no Broker
+        console.log("Conectando " + host + " " + port);
+        mqtt = new Paho.MQTT.Client(host, port, "IeCJSClient" + parseInt(Math.random() * 1e5));
+        var options = { timeout: 10,
+                        keepAliveInterval: 10,
+                        onSuccess: onConnect,
+                        onFailure: onError
+                        };
+        mqtt.onMessageArrived = onMessageArrived;
+        mqtt.onConnectionLost = onError;
+        mqtt.connect(options);
+    }
+
+    /***************************************************
+     * Gráficos
+     */
+
+    // Instancias dos gráficos
+    google.charts.load('current', {'packages':['gauge'], 'language': 'pt-br', 'mapsApiKey': 'AIzaSyBWF8UvD9TyJSKsSCKP3PtHisRPbG4zuRA'});
+    google.charts.setOnLoadCallback(drawTemp);
+    google.charts.setOnLoadCallback(drawUmi);
+    google.charts.setOnLoadCallback(drawInt);
+    
+    // Variáveis para gráficos
+    var chartTemp;
+    var chartUmi;
+    var chartInt;
+    var dataTemp;
+    var dataUmi;
+    var dataInt;
+    var optionsTemp;
+    var optionsUmi;
+    var optionsInt;
+
+    function drawTemp() {
+        // Desenha Temperatura
+        dataTemp = google.visualization.arrayToDataTable([
+            ['Label', 'Value'],
+            ['Temp. °C', 0]
+        ]);
+        optionsTemp = {
+            min: -10, max: 50,
+            majorTicks: ["-10", "0", "10", "20", "30", "40", "50"],
+            minorTicks: 2,
+            greenFrom: -10, greenTo: 5,
+            greenColor: "#00c0ff",
+            redFrom: 30, redTo: 50
+        };
+        chartTemp = new google.visualization.Gauge(document.getElementById('temp'));
+        chartTemp.draw(dataTemp, optionsTemp);
+    }
+
+    function drawUmi() {
+        // Desenha Umidade
+        dataUmi = google.visualization.arrayToDataTable([
+            ['Label', 'Value'],
+            ['Umid. %', 0]
+        ]);
+        optionsUmi = {
+            min: 0, max: 100,
+            majorTicks: ["0", "10", "20", "30", "40", "50", "60", "70", "80", "90", "100"],
+            minorTicks: 2,
+            redFrom: 0, redTo: 30,
+            yellowFrom: 80, yellowTo: 100
+        };
+        chartUmi = new google.visualization.Gauge(document.getElementById('umi'));
+        chartUmi.draw(dataUmi, optionsUmi);
+    }
+
+    function drawInt() {
+        // Desenha Inteiro
+        dataInt = google.visualization.arrayToDataTable([
+            ['Label', 'Value'],
+            ['x1000', 0]
+        ]);
+        optionsInt = {
+            min: 0, max: 70000,
+            majorTicks: ["0", "10", "20", "30", "40", "50", "60", "70"],
+            minorTicks: 0,
+            greenFrom: 0, greenTo: 30000,
+            yellowFrom: 30000, yellowTo: 50000,
+            redFrom: 50000, redTo: 70000
+        };
+        chartInt = new google.visualization.Gauge(document.getElementById('int'));
+        chartInt.draw(dataInt, optionsInt);
+    }
+  </script>
+</head>
+<body onload="MQTTConnect()">
+    <table align="center">
+        <tr>
+            <td id="temp" style="width: 200px; height: 200px;"></td>
+            <td id="umi" style="width: 200px; height: 200px;"></td>
+            <td id="int" style="width: 200px; height: 200px;"></td>
+        </tr>
+        <tr>
+            <th id="toggle">Status: n/d</th>
+            <th id="dt" colspan="2">Atualização: n/d</th>
+        </tr>
+    </table>
+</body>
+</html>
